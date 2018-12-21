@@ -14,7 +14,7 @@ class CommandLine(user_interface.UI):
         print("\n---|---|---\n".join(row_strings))
         print("")
 
-    def get_move(self):
+    def get_move(self, board):
         not_valid = True
         while not_valid:
             try:

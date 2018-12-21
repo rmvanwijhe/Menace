@@ -67,8 +67,6 @@ class Graphical(user_interface.UI):
         self.draw_board()
 
         # Go through the game board
-        # TODO: since the board is stored in it's least str length state, the board might flip during play
-        # That is annoying and making sure that doesn't happen can (should) be done (here?)
         if board is not None:
             for row in range(3):
                 for col in range(3):
@@ -80,19 +78,19 @@ class Graphical(user_interface.UI):
                         self.draw_o(row, col)
 
         self.draw_score("wins %d/%d" % (self.score[0], sum(self.score)), 110)
-        self.draw_score("(draws %d, losses %d)" % (self.score[1], self.score[2]), 40)
+        self.draw_score("(draws %d, losses %d)" % (self.score[2], self.score[1]), 40)
 
         # Update the screen
         pygame.display.update()
 
-    def tick(self, fps=60):
+    def tick(self, fps=120):
         self.clock.tick(fps)
 
         # If there are 'quit' events, end the game
         for _ in pygame.event.get(pygame.locals.QUIT):
             sys.exit(0)
 
-    def get_move(self):
+    def get_move(self, board):
         for event in pygame.event.get():
             # print(event)
             if event.type == pygame.locals.QUIT:
@@ -103,3 +101,5 @@ class Graphical(user_interface.UI):
 
     def add_score(self, winner):
         self.score[winner - 1] += 1
+        if sum(self.score) > 500:
+            self.score = [0, 0, 0]
