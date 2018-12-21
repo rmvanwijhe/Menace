@@ -18,8 +18,9 @@ class Menace(player.Player):
             # Set ensures each board can appear at most once
             round_boards = set()
             for matchbox in matchboxes[game_round]:
-                for board in matchbox.options.keys():
-                    round_boards.add(board)
+
+                for move in matchbox.options.keys():
+                    round_boards.add(matchbox.board.make_move(move))
 
             # Use list comprehension to generate a list of matchboxes for this game_round
             # and append this list to the pile of matchboxes
@@ -43,54 +44,33 @@ class Menace(player.Player):
                 pickle.dump(self.matchboxes, file)
 
     # Have the system learn from the current game_history
-    def learn(self, debug=False):
+    def learn(self, winner, debug=False):
         debug = debug or self.debug
-        if  len(self.game_history) < 1:
-            # Nothing to learn from...
-            return
-        winner = self.game_history[-1].winner()
-        if not winner:
-            # if the last game had no winner we did not see the winning move...
-            # the player making the last move must have won, i.e.:
-            winner = self.game_history[-1].player()
-            # TODO: This assumes MENACE sees all uneven moves, so it will always make the drawing move itself
-            # If MENACE could only be player 2 this assumption no longer holds!
 
         # Learning means manipulating the beads in the matchboxes, so have each relevant matchbox do that to itself
-        for game_round in range(0, len(self.game_history)-1):
-            for matchbox in self.matchboxes[game_round]:
-                if matchbox.board == self.game_history[game_round]:
-                    matchbox.reinforce(play=self.game_history[game_round + 1], winner=winner, debug=debug)
+        for matchbox, move_coordinate in self.game_history:
+            matchbox.reinforce(play=move_coordinate, winner=winner, debug=debug)
 
         if self.output_file:
             with open(self.output_file, "wb+") as file:
                 pickle.dump(self.matchboxes, file)
 
-    # Return an new board representing the move we made
+    # Return a new board representing the move we made
     def move(self, board):
-        # If we have a new board that means the previous game has finished,
-        # Learn from that game, then reset the game_history
-        if board.move() == 0:
-            self.learn()
-            self.game_history = [board]
-
-        if len(self.game_history) == board.move():
-            # a move was made outside of menace
-            # TODO: we assume if the game length is what we expect everything is fine, we could do more checks
-            # validating this assumption...
-            self.game_history.append(board)
-
-        if not (len(self.game_history) == board.move() + 1):
-            raise AttributeError("Game history/board mismatch, cannot deal!")
-
         # Find the matchbox for the current state, have that matchbox decide on the next move (based on its beads)
-        for matchbox in self.matchboxes[board.move()]:
+        for matchbox in self.matchboxes[board.turn()]:
             if matchbox.board == board:
-                board = matchbox.move()
-                self.game_history.append(board)
-                return board
+                move_coordinate = matchbox.move(debug=self.debug)
+                self.game_history.append((matchbox, move_coordinate))
+                return board.translate(matchbox.board, move_coordinate)
         else:
+            print(board)
+            # self.show_state(board.move())
             raise AssertionError("No matchbox matches this board")
+
+    def game_finished(self, winning_board):
+        self.learn(winning_board.winner())
+        self.game_history = []
 
     # Have MENACE play a single game against itself, returns the winner
     def game(self, debug=False):
@@ -131,12 +111,12 @@ class Matchbox(object):
 
     # When creating a new matchbox we create a dictionary of all possible moves (asking the board for that list)
     # For each move we add initial_value beads to the box (what that value should be can be experimented with)
-    def __init__(self, board, initial_value=15):
+    def __init__(self, board, initial_value=7):
+        board.make_minimal()
         self.board = board
         self.options = {}
-        if not board.winner():
-            for move in board.unique_legal_moves():
-                self.options[move] = initial_value
+        for move in board.legal_moves(unique=True):
+            self.options[move] = initial_value
         # TODO: check whether one of the options is a 'win', if so, all non winning options can be removed
         # This should reduce search space and increase training speed (i.e. in round 5 a winning option could exist,
         # but 4 non winning options need to be eliminated by trial and error now)
@@ -145,7 +125,10 @@ class Matchbox(object):
     # We then look at the number of beads for each option and subtract that number from the random number
     # Once the random number is 'depleted' we found our option
     # So random number 0 gives us the first option, and random number = total beads gives us the last
-    def move(self):
+    def move(self, debug=False):
+        if debug:
+            print(self.options)
+            print(self.board)
         total_beads = sum(self.options.values())
         random_move = random.randint(0, total_beads)
         for move_candidate in self.options:
@@ -166,7 +149,7 @@ class Matchbox(object):
             if debug:
                 print("Not the worst option...")
             self.options[play] += 0
-        elif (self.board.move() % 2) + 1 == winner:
+        elif (self.board.turn() % 2) + 1 == winner:
             # This move was part of a winning strategy
             if debug:
                 print("Do this!")

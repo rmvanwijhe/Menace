@@ -15,10 +15,7 @@ class Human(player.Player):
     def move(self, board):
         while True:
             self.ui.tick()
-            move = self.ui.get_move()
+            move = self.ui.get_move(board)
             if move in self.keys:
                 coordinate = self.keys[move]
-                if board.cell(coordinate) == 0:
-                    # Only move on an empty cell,
-                    # TODO should notify the user if this is not the case
-                    return board.make_move(coordinate)
+                return coordinate
