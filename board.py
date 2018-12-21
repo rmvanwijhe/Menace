@@ -1,5 +1,6 @@
 import itertools
 from copy import deepcopy
+import numpy as np
 
 # define all rotations (clockwise)
 _rotations = [[[(2, 0), (1, 0), (0, 0)],
@@ -12,7 +13,8 @@ _rotations = [[[(2, 0), (1, 0), (0, 0)],
 
               [[(0, 2), (1, 2), (2, 2)],
                [(0, 1), (1, 1), (2, 1)],
-               [(0, 0), (1, 0), (2, 0)]]]
+               [(0, 0), (1, 0), (2, 0)]]
+			  ]
 
 # flip along vertical axis
 _flip = [[(0, 2), (0, 1), (0, 0)],
@@ -30,8 +32,16 @@ _win_conditions = [
 
         [(0, 0), (1, 1), (2, 2)],
         [(2, 0), (1, 1), (0, 2)],
-    ]
+				   ]
 
+
+def same_states(s1, s2):
+    """
+    Check states s1 (or one of in case of array-like) and s2 are the same.
+    """
+    s1 = np.array(s1)
+    s2 = np.array(s2)
+    return np.any(np.isclose(np.mean(np.square(s1-s2), axis=(1, 2)), 0))
 
 # returns a state based on an original state and a translation matrix
 def _translate(state, translation):
@@ -89,11 +99,14 @@ class Board(object):
 
     # Make it possible to use == on two boards
     def __eq__(self, other):
-        return str(self.state) == str(other.state)
+        smallest, _, _ = _get_minimal_rotation(self.state)
+        other_smallest, _, _ = _get_minimal_rotation(other.state)
+        return _state_str(smallest) == _state_str(other_smallest)
 
     # Allows Boards to be used as the key in a set
     def __hash__(self):
-        return hash(str(self))
+        smallest, _, _ = _get_minimal_rotation(self.state)
+        return hash(str(_state_str(smallest)))
 
     # Get the value of a cell
     # TODO: make it so you can call board[x, y] instead of board.cell(x,y)
@@ -109,7 +122,9 @@ class Board(object):
                 count += 1
         return count
 
-    def make_move(self, coordinate):
+    def make_move(self, coordinate, player=None):
+        if player is not None and player is not self.player():
+            raise ValueError('It is not that player\'s move')
         new_state = _state_set_cell(self.state, coordinate, self.player())
         return Board(new_state, self.flips, self.rotations)
 
@@ -140,7 +155,8 @@ class Board(object):
         if state is None:
             self.state = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
         else:
-            self.state, _, _ = _get_minimal_rotation(deepcopy(state))
+            # self.state, _, _ = _get_minimal_rotation(deepcopy(state))
+            self.state = state
 
     # Return a set of possible moves given a board
     # The usage of set ensures every move appears exactly once
