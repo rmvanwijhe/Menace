@@ -5,4 +5,4 @@ import player
 class RandomMove(player.Player):
 
     def move(self, board):
-        return random.sample(board.unique_legal_moves(), 1)[0]
+        return random.sample(board.legal_moves(unique=False), 1)[0]
